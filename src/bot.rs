@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 
 use serenity::{
     async_trait,
@@ -19,7 +20,7 @@ pub type LambdaUserList = Vec<LambdaUser>;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LambdaUser {
-    id: f64,
+    id: u64,
     capes: Vec<Cape>,
     is_premium: bool,
 }
@@ -78,21 +79,29 @@ impl EventHandler for Handler {
     // events can be dispatched simultaneously.
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "!test" {
-            
+
             let lambda_user_list : LambdaUserList = getFullCapeData();
-            
-            for user in lambda_user_list {
+
+            for user in &lambda_user_list {
 
                 let embed_data : PlayerEmbedData = PlayerEmbedData::new(user.clone());
-
                 if let Err(why) = msg.channel_id.send_message(&ctx.http, |m| m
                         .embed(|e| e
                             .title(embed_data.username)
                             .image(embed_data.skin_url)
 
                         )).await {
-                    println!("Error sending message: {:?}", why);
+                    println!("Error sending message : {:?}", why);
                 }
+            }
+            
+            let json_string_out : String = cape_data_to_string(&lambda_user_list);
+            println!("{}", &json_string_out);
+
+            fs::write("./debugjson", &json_string_out).expect("Error writing to file!");
+
+            if let Err(why) = msg.channel_id.say(&ctx.http, &json_string_out).await {
+                println!("Error sending message: {:?}", why);
             }
         }
     }
@@ -123,6 +132,14 @@ fn getFullCapeData() -> LambdaUserList {
     let res : LambdaUserList = serde_json::from_str(&html).unwrap();
     return res;
  }
+
+fn cape_data_to_string(list : &LambdaUserList) -> String {
+
+    let output : String = serde_json::to_string_pretty(&list).unwrap();
+    return output;
+}
+
+
 
 #[tokio::main]
 async fn main() {
